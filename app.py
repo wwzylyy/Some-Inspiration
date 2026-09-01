@@ -4,7 +4,7 @@ import httpx
 import asyncio
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -20,8 +20,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 class BubbleRequest(BaseModel):
-    bubble: str  # e.g. "AI, 科技, 创业, 中国互联网"
-    language: str = "zh"  # zh or en
+    bubble: str
+    language: str = "zh"
 
 
 OPPOSITE_DOMAINS_PROMPT = """用户描述了他们的信息茧房："{bubble}"
@@ -83,7 +83,6 @@ async def get_opposite_domains(bubble: str) -> list[dict]:
 
 
 async def search_content(query: str) -> list[dict]:
-    # Prefer Firecrawl if key available, fallback to DuckDuckGo (free)
     if FIRECRAWL_API_KEY:
         try:
             async with httpx.AsyncClient(timeout=15.0) as http:
@@ -97,7 +96,6 @@ async def search_content(query: str) -> list[dict]:
         except Exception:
             pass
 
-    # DuckDuckGo fallback — runs in thread pool to avoid blocking
     loop = asyncio.get_event_loop()
     def ddg_search():
         with DDGS() as ddgs:
@@ -145,27 +143,137 @@ async def score_result(bubble: str, domain_name: str, result: dict) -> dict | No
     return None
 
 
+def sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+async def stream_recommend(bubble: str):
+    # Phase 1: get domains
+    yield sse("status", {"msg": "正在分析茧房结构..."})
+    try:
+        domains = await get_opposite_domains(bubble)
+    except Exception as e:
+        yield sse("error", {"msg": str(e)})
+        return
+
+    yield sse("domains", {"domains": [d["name"] for d in domains]})
+
+    # Phase 2: for each domain, search then score immediately (pipeline per domain)
+    seen_urls = set()
+    emitted = 0
+
+    async def process_domain(domain: dict):
+        nonlocal emitted
+        name = domain["name"]
+        results = await search_content(domain["search_query"])
+        tasks = [score_result(bubble, name, r) for r in results[:3]]
+        scored_list = await asyncio.gather(*tasks, return_exceptions=True)
+        items = []
+        for s in scored_list:
+            if s and not isinstance(s, Exception) and s["url"] not in seen_urls:
+                seen_urls.add(s["url"])
+                items.append(s)
+        items.sort(key=lambda x: x["score"], reverse=True)
+        return name, items
+
+    # Run all domains concurrently but yield results as each domain finishes
+    queue: asyncio.Queue = asyncio.Queue()
+
+    async def worker(domain):
+        result = await process_domain(domain)
+        await queue.put(result)
+
+    tasks = [asyncio.create_task(worker(d)) for d in domains]
+
+    for _ in range(len(domains)):
+        name, items = await queue.get()
+        yield sse("searching", {"domain": name})
+        for item in items:
+            if emitted >= 8:
+                break
+            emitted += 1
+            yield sse("card", item)
+
+    await asyncio.gather(*tasks, return_exceptions=True)
+    yield sse("done", {"total": emitted})
+
+
+@app.get("/douyin-stream")
+async def douyin_stream():
+    from douyin_scraper import scrape_douyin_likes, analyze_bubble
+
+    queue: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_event_loop()
+
+    def on_status(msg: dict):
+        asyncio.run_coroutine_threadsafe(queue.put(msg), loop)
+
+    async def generate():
+        # kick off scraper in background
+        task = asyncio.create_task(scrape_douyin_likes(on_status))
+
+        while True:
+            try:
+                msg = await asyncio.wait_for(queue.get(), timeout=130.0)
+            except asyncio.TimeoutError:
+                yield sse("error", {"msg": "操作超时"})
+                break
+
+            yield sse("status", msg)
+
+            if msg.get("step") in ("done_scraping", "error"):
+                break
+
+        titles = await task
+
+        if titles:
+            bubble = await asyncio.get_event_loop().run_in_executor(
+                None, analyze_bubble, titles, client
+            )
+            yield sse("bubble", {"bubble": bubble, "count": len(titles)})
+        else:
+            yield sse("error", {"msg": "未获取到数据，请重试"})
+
+        yield sse("done", {})
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.get("/")
 async def index():
     return FileResponse("static/index.html")
+
+
+@app.get("/stream")
+async def stream(bubble: str):
+    if not bubble.strip():
+        raise HTTPException(status_code=400, detail="bubble cannot be empty")
+    return StreamingResponse(
+        stream_recommend(bubble),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        }
+    )
 
 
 @app.post("/recommend")
 async def recommend(req: BubbleRequest):
     if not req.bubble.strip():
         raise HTTPException(status_code=400, detail="bubble cannot be empty")
-
-    # Step 1: get opposite domains
     try:
         domains = await get_opposite_domains(req.bubble)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get domains: {e}")
 
-    # Step 2: search each domain in parallel
     search_tasks = [search_content(d["search_query"]) for d in domains]
     search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
 
-    # Step 3: score each result
     score_tasks = []
     for domain, results in zip(domains, search_results):
         if isinstance(results, Exception) or not results:
@@ -174,7 +282,6 @@ async def recommend(req: BubbleRequest):
             score_tasks.append(score_result(req.bubble, domain["name"], r))
 
     scored = await asyncio.gather(*score_tasks, return_exceptions=True)
-
     items = [s for s in scored if s and not isinstance(s, Exception)]
     items.sort(key=lambda x: x["score"], reverse=True)
 
@@ -187,4 +294,4 @@ async def recommend(req: BubbleRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8765, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=8767)

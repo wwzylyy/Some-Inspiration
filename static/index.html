@@ -6,6 +6,7 @@
   <title>反推荐引擎</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: #0a0a0f;
@@ -13,9 +14,43 @@
       min-height: 100vh;
     }
 
+    /* ── top bar ── */
+    .topbar {
+      display: flex;
+      justify-content: flex-end;
+      padding: 16px 28px;
+      position: fixed;
+      top: 0; right: 0;
+      z-index: 100;
+    }
+    .bookmark-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      background: #16161f;
+      border: 1px solid #2d2d3d;
+      border-radius: 10px;
+      color: #7c7c9a;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .bookmark-btn:hover { border-color: #7c5cfc; color: #a78bfa; }
+    .bookmark-count {
+      background: #7c5cfc;
+      color: white;
+      font-size: 0.7rem;
+      padding: 1px 6px;
+      border-radius: 10px;
+      display: none;
+    }
+    .bookmark-count.has-items { display: inline; }
+
+    /* ── hero ── */
     .hero {
       text-align: center;
-      padding: 64px 24px 48px;
+      padding: 80px 24px 48px;
     }
     .hero h1 {
       font-size: 2.8rem;
@@ -34,6 +69,7 @@
       line-height: 1.6;
     }
 
+    /* ── input ── */
     .input-area {
       max-width: 600px;
       margin: 0 auto;
@@ -73,73 +109,121 @@
     .go-btn:active { transform: scale(0.97); }
     .go-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-    .hint {
+    .input-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .hint { font-size: 0.82rem; color: #4a4a5a; }
+    .douyin-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid #2d2d3d;
+      border-radius: 8px;
+      color: #6060a0;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+      white-space: nowrap;
+    }
+    .douyin-btn:hover { border-color: #fe2c55aa; color: #fe2c55; }
+    .douyin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .douyin-icon { font-size: 0.9rem; }
+
+    .douyin-status {
       margin-top: 10px;
       font-size: 0.82rem;
-      color: #4a4a5a;
-      padding-left: 2px;
+      color: #7c5cfc;
+      min-height: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
+    .douyin-status .spin {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid #7c5cfc44;
+      border-top-color: #7c5cfc;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .douyin-status.success { color: #34d399; }
+    .douyin-status.error { color: #f87171; }
 
-    .status-bar {
+    /* ── domain pills live feed ── */
+    .domain-feed {
       max-width: 600px;
-      margin: 32px auto 0;
+      margin: 28px auto 0;
       padding: 0 24px;
+      min-height: 40px;
       display: none;
     }
-    .status-bar.visible { display: block; }
-    .progress-label { color: #7c5cfc; font-size: 0.9rem; margin-bottom: 8px; }
-    .progress-track {
-      height: 3px;
-      background: #2d2d3d;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #7c5cfc, #38bdf8);
-      border-radius: 2px;
-      width: 0%;
-      transition: width 0.4s ease;
-    }
-    .domains-explored {
-      margin-top: 12px;
-      font-size: 0.8rem;
-      color: #4a4a5a;
-    }
-    .domain-tag {
-      display: inline-block;
-      padding: 3px 10px;
-      background: #1a1a2a;
-      border-radius: 20px;
-      margin: 3px 4px 3px 0;
-      border: 1px solid #2d2d3d;
-      color: #7c7c9a;
-      font-size: 0.78rem;
-    }
+    .domain-feed.visible { display: block; }
+    .feed-label { font-size: 0.78rem; color: #4a4a5a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.08em; }
 
+    .domain-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      background: #16161f;
+      border: 1px solid #2d2d3d;
+      border-radius: 20px;
+      margin: 3px 5px 3px 0;
+      font-size: 0.8rem;
+      color: #6060a0;
+      transition: border-color 0.3s, color 0.3s;
+    }
+    .domain-pill.searching {
+      border-color: #7c5cfc88;
+      color: #a78bfa;
+    }
+    .domain-pill.searching .pill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #7c5cfc;
+      animation: blink 0.8s ease-in-out infinite;
+    }
+    .domain-pill.done { border-color: #34d39944; color: #34d39988; }
+    .domain-pill.done .pill-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #34d399;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+    /* ── results ── */
     .results {
       max-width: 760px;
-      margin: 48px auto 80px;
+      margin: 44px auto 100px;
       padding: 0 24px;
-      display: none;
     }
-    .results.visible { display: block; }
     .results-header {
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: #4a4a5a;
       text-transform: uppercase;
       letter-spacing: 0.1em;
       margin-bottom: 20px;
+      display: none;
     }
+    .results-header.visible { display: block; }
 
-    @keyframes border-spin {
-      to { --angle: 360deg; }
+    /* ── card ── */
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
     @property --angle {
       syntax: '<angle>';
       initial-value: 0deg;
       inherits: false;
     }
+    @keyframes border-spin { to { --angle: 360deg; } }
 
     .card {
       background: #12121a;
@@ -147,11 +231,10 @@
       border-radius: 16px;
       padding: 24px;
       margin-bottom: 16px;
-      transition: border-color 0.3s, transform 0.2s;
       position: relative;
       overflow: hidden;
+      animation: card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
-
     .card::after {
       content: '';
       position: absolute;
@@ -167,44 +250,20 @@
       animation: border-spin 3s linear infinite;
       pointer-events: none;
     }
-
-    .card:hover {
-      border-color: transparent;
-      transform: translateY(-2px);
-    }
-    .card:hover::after {
-      opacity: 1;
-    }
-
+    .card:hover { border-color: transparent; transform: translateY(-2px); transition: transform 0.2s, border-color 0.3s; }
+    .card:hover::after { opacity: 1; }
     .card::before {
       content: '';
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 2px;
       background: linear-gradient(90deg, #7c5cfc33, #38bdf833, #34d39933);
+      pointer-events: none;
     }
 
-    .card-domain {
-      font-size: 0.72rem;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: #7c5cfc;
-      margin-bottom: 8px;
-    }
-    .card-title {
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: #d4d4e4;
-      margin-bottom: 12px;
-      line-height: 1.4;
-    }
-    .card-hook {
-      font-size: 0.95rem;
-      color: #9090aa;
-      margin-bottom: 16px;
-      line-height: 1.5;
-      font-style: italic;
-    }
+    .card-domain { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #7c5cfc; margin-bottom: 8px; }
+    .card-title { font-size: 1.05rem; font-weight: 600; color: #d4d4e4; margin-bottom: 12px; line-height: 1.4; }
+    .card-hook { font-size: 0.95rem; color: #9090aa; margin-bottom: 16px; line-height: 1.5; font-style: italic; }
 
     .card-meta {
       display: grid;
@@ -212,44 +271,37 @@
       gap: 12px;
       margin-bottom: 16px;
     }
-    .meta-block {
-      background: #0d0d15;
-      border-radius: 10px;
-      padding: 12px 14px;
-    }
-    .meta-label {
-      font-size: 0.7rem;
-      color: #4a4a5a;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      margin-bottom: 5px;
-    }
-    .meta-text {
-      font-size: 0.85rem;
-      color: #8a8aa0;
-      line-height: 1.45;
-    }
+    .meta-block { background: #0d0d15; border-radius: 10px; padding: 12px 14px; }
+    .meta-label { font-size: 0.7rem; color: #4a4a5a; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+    .meta-text { font-size: 0.85rem; color: #8a8aa0; line-height: 1.45; }
 
     .card-footer {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-    .score-badge {
-      font-size: 0.75rem;
-      color: #4a4a5a;
-    }
-    .score-dots {
-      display: inline-flex;
-      gap: 3px;
-      margin-left: 6px;
-    }
-    .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: #2d2d3d;
-    }
+    .score-badge { font-size: 0.75rem; color: #4a4a5a; display: flex; align-items: center; gap: 4px; }
+    .score-dots { display: inline-flex; gap: 3px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #2d2d3d; }
     .dot.active { background: #7c5cfc; }
+
+    .card-actions { display: flex; gap: 8px; align-items: center; }
+
+    .save-btn {
+      padding: 7px 14px;
+      background: transparent;
+      border: 1px solid #2d2d3d;
+      border-radius: 8px;
+      color: #5a5a7a;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .save-btn:hover { border-color: #f59e0b88; color: #f59e0b; }
+    .save-btn.saved { border-color: #f59e0b; color: #f59e0b; background: #f59e0b11; }
 
     .read-link {
       padding: 8px 20px;
@@ -261,15 +313,138 @@
       font-size: 0.85rem;
       transition: border-color 0.2s, color 0.2s;
     }
-    .read-link:hover {
-      border-color: #7c5cfc;
-      color: #a78bfa;
+    .read-link:hover { border-color: #7c5cfc; color: #a78bfa; }
+
+    /* ── skeleton loader ── */
+    @keyframes shimmer {
+      0% { background-position: -400px 0; }
+      100% { background-position: 400px 0; }
     }
+    .skeleton {
+      background: #12121a;
+      border: 1px solid #1e1e2e;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+      animation: card-in 0.3s ease both;
+    }
+    .skel-line {
+      height: 14px;
+      border-radius: 6px;
+      margin-bottom: 10px;
+      background: linear-gradient(90deg, #1e1e2e 25%, #2a2a3e 50%, #1e1e2e 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s infinite;
+    }
+    .skel-line.short { width: 40%; }
+    .skel-line.medium { width: 70%; }
+    .skel-line.long { width: 90%; }
+    .skel-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+    .skel-block { background: #0d0d15; border-radius: 10px; padding: 12px 14px; }
+
+    /* ── bookmark drawer ── */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    .drawer-overlay.open { opacity: 1; pointer-events: all; }
+
+    .drawer {
+      position: fixed;
+      top: 0; right: 0;
+      width: 420px;
+      max-width: 92vw;
+      height: 100vh;
+      background: #0e0e18;
+      border-left: 1px solid #2d2d3d;
+      z-index: 201;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      padding: 24px 20px 16px;
+      border-bottom: 1px solid #1e1e2e;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .drawer-title { font-size: 1rem; font-weight: 600; color: #d4d4e4; }
+    .drawer-close {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid #2d2d3d;
+      color: #7c7c9a;
+      cursor: pointer;
+      font-size: 1.1rem;
+      display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .drawer-close:hover { border-color: #5a5a7a; color: #d4d4e4; }
+
+    .drawer-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 20px;
+    }
+    .drawer-empty {
+      text-align: center;
+      color: #4a4a5a;
+      font-size: 0.9rem;
+      margin-top: 60px;
+    }
+
+    .saved-item {
+      padding: 14px 16px;
+      background: #12121a;
+      border: 1px solid #1e1e2e;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      animation: card-in 0.3s ease both;
+    }
+    .saved-item-domain { font-size: 0.7rem; color: #7c5cfc; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+    .saved-item-title { font-size: 0.9rem; color: #c4c4d4; line-height: 1.4; margin-bottom: 8px; }
+    .saved-item-footer { display: flex; justify-content: space-between; align-items: center; }
+    .saved-item-link { font-size: 0.8rem; color: #7c7c9a; text-decoration: none; }
+    .saved-item-link:hover { color: #a78bfa; }
+    .saved-item-remove {
+      font-size: 0.75rem;
+      color: #4a4a5a;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 2px 6px;
+    }
+    .saved-item-remove:hover { color: #f87171; }
+
+    .drawer-clear {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid #2d2d3d;
+      border-radius: 8px;
+      color: #5a5a7a;
+      font-size: 0.82rem;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .drawer-clear:hover { border-color: #f8717144; color: #f87171; }
 
     .error-msg {
       max-width: 600px;
-      margin: 32px auto;
-      padding: 16px 24px;
+      margin: 28px auto;
+      padding: 14px 20px;
       background: #1a0a0a;
       border: 1px solid #5a1a1a;
       border-radius: 12px;
@@ -282,11 +457,21 @@
 </head>
 <body>
 
+<!-- top bar -->
+<div class="topbar">
+  <button class="bookmark-btn" onclick="toggleDrawer()">
+    <span>⭐ 收藏夹</span>
+    <span class="bookmark-count" id="bookmarkCount">0</span>
+  </button>
+</div>
+
+<!-- hero -->
 <div class="hero">
   <h1>反推荐引擎</h1>
   <p>告诉我你的信息茧房，我帮你找到你绝对不会主动发现的东西</p>
 </div>
 
+<!-- input -->
 <div class="input-area">
   <div class="input-row">
     <input
@@ -297,139 +482,331 @@
     />
     <button class="go-btn" id="goBtn" onclick="startRecommend()">突破茧房</button>
   </div>
-  <div class="hint">可以用中文或英文描述你平时读什么、关注什么</div>
+  <div class="input-bottom">
+    <span class="hint">可以用中文或英文描述你平时读什么、关注什么</span>
+    <button class="douyin-btn" id="douyinBtn" onclick="importDouyin()">
+      <span class="douyin-icon">🎵</span> 从抖音导入
+    </button>
+  </div>
+  <div class="douyin-status" id="douyinStatus"></div>
 </div>
 
-<div class="status-bar" id="statusBar">
-  <div class="progress-label" id="progressLabel">正在探索对立领域...</div>
-  <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-  <div class="domains-explored" id="domainsExplored"></div>
+<!-- live domain feed -->
+<div class="domain-feed" id="domainFeed">
+  <div class="feed-label">正在探索</div>
+  <div id="domainPills"></div>
 </div>
 
 <div class="error-msg" id="errorMsg"></div>
 
-<div class="results" id="results">
-  <div class="results-header">反推荐结果</div>
+<!-- results -->
+<div class="results">
+  <div class="results-header" id="resultsHeader">反推荐结果</div>
   <div id="cardContainer"></div>
 </div>
 
+<!-- bookmark drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="toggleDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-header">
+    <span class="drawer-title">⭐ 我的收藏</span>
+    <button class="drawer-close" onclick="toggleDrawer()">✕</button>
+  </div>
+  <div class="drawer-body" id="drawerBody"></div>
+</div>
+
 <script>
-  async function startRecommend() {
-    const bubble = document.getElementById('bubbleInput').value.trim();
-    if (!bubble) return;
+// ── bookmarks ──
+const STORAGE_KEY = 'anti-rec-bookmarks';
 
-    const btn = document.getElementById('goBtn');
-    const statusBar = document.getElementById('statusBar');
-    const errorMsg = document.getElementById('errorMsg');
-    const results = document.getElementById('results');
+function loadBookmarks() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveBookmarks(list) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+function isBookmarked(url) {
+  return loadBookmarks().some(b => b.url === url);
+}
+function toggleBookmark(item) {
+  let list = loadBookmarks();
+  const idx = list.findIndex(b => b.url === item.url);
+  if (idx >= 0) { list.splice(idx, 1); }
+  else { list.unshift(item); }
+  saveBookmarks(list);
+  updateBookmarkUI();
+  renderDrawer();
+  return idx < 0; // true = just added
+}
+function updateBookmarkUI() {
+  const list = loadBookmarks();
+  const el = document.getElementById('bookmarkCount');
+  el.textContent = list.length;
+  el.classList.toggle('has-items', list.length > 0);
+}
 
-    btn.disabled = true;
-    statusBar.classList.add('visible');
-    errorMsg.classList.remove('visible');
-    results.classList.remove('visible');
-    setProgress(10, '正在分析你的信息茧房...');
+function renderDrawer() {
+  const list = loadBookmarks();
+  const body = document.getElementById('drawerBody');
+  if (!list.length) {
+    body.innerHTML = '<div class="drawer-empty">还没有收藏<br><br>点击卡片上的 ⭐ 保存</div>';
+    return;
+  }
+  body.innerHTML = list.map(item => `
+    <div class="saved-item">
+      <div class="saved-item-domain">${escHtml(item.domain)}</div>
+      <div class="saved-item-title">${escHtml(item.title)}</div>
+      <div class="saved-item-footer">
+        <a class="saved-item-link" href="${escHtml(item.url)}" target="_blank" rel="noopener">阅读 →</a>
+        <button class="saved-item-remove" onclick="removeSaved('${escHtml(item.url)}')">移除</button>
+      </div>
+    </div>
+  `).join('') + '<button class="drawer-clear" onclick="clearAll()">清空收藏夹</button>';
+}
+function removeSaved(url) {
+  let list = loadBookmarks();
+  saveBookmarks(list.filter(b => b.url !== url));
+  updateBookmarkUI();
+  renderDrawer();
+  // update card button if visible
+  document.querySelectorAll('.save-btn').forEach(btn => {
+    if (btn.dataset.url === url) {
+      btn.classList.remove('saved');
+      btn.textContent = '☆ 收藏';
+    }
+  });
+}
+function clearAll() {
+  saveBookmarks([]);
+  updateBookmarkUI();
+  renderDrawer();
+  document.querySelectorAll('.save-btn.saved').forEach(btn => {
+    btn.classList.remove('saved');
+    btn.textContent = '☆ 收藏';
+  });
+}
 
-    try {
-      const progressInterval = animateProgress(10, 70, 8000);
+let drawerOpen = false;
+function toggleDrawer() {
+  drawerOpen = !drawerOpen;
+  document.getElementById('drawer').classList.toggle('open', drawerOpen);
+  document.getElementById('drawerOverlay').classList.toggle('open', drawerOpen);
+  if (drawerOpen) renderDrawer();
+}
 
-      const resp = await fetch('/recommend', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({bubble})
-      });
+// ── streaming recommend (fetch-based, no EventSource reconnect issues) ──
+let streamAbort = null;
 
-      clearInterval(progressInterval);
+async function startRecommend() {
+  const bubble = document.getElementById('bubbleInput').value.trim();
+  if (!bubble) return;
 
-      if (!resp.ok) {
-        const err = await resp.json();
-        throw new Error(err.detail || 'Request failed');
-      }
+  if (streamAbort) { streamAbort.abort(); streamAbort = null; }
 
-      setProgress(90, '正在生成解释...');
-      const data = await resp.json();
+  const btn = document.getElementById('goBtn');
+  const feed = document.getElementById('domainFeed');
+  const pills = document.getElementById('domainPills');
+  const header = document.getElementById('resultsHeader');
+  const container = document.getElementById('cardContainer');
+  const errorMsg = document.getElementById('errorMsg');
 
-      // show explored domains
-      if (data.domains_explored?.length) {
-        document.getElementById('domainsExplored').innerHTML =
-          '探索了：' + data.domains_explored.map(d =>
-            `<span class="domain-tag">${d}</span>`
+  btn.disabled = true;
+  feed.classList.add('visible');
+  pills.innerHTML = `<span style="color:#6b7280;font-size:0.82rem">正在分析茧房...</span>`;
+  header.classList.remove('visible');
+  container.innerHTML = '';
+  errorMsg.classList.remove('visible');
+
+  const ctrl = new AbortController();
+  streamAbort = ctrl;
+
+  function finalize() {
+    btn.disabled = false;
+    streamAbort = null;
+    document.querySelectorAll('.domain-pill.searching').forEach(p => {
+      p.classList.remove('searching');
+      p.classList.add('done');
+    });
+  }
+
+  try {
+    const resp = await fetch(`/stream?bubble=${encodeURIComponent(bubble)}`, {
+      signal: ctrl.signal,
+    });
+    if (!resp.ok) { showError('服务器错误 ' + resp.status); finalize(); return; }
+
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n');
+      buf = parts.pop();
+      for (const chunk of parts) {
+        const eventMatch = chunk.match(/^event:\s*(\S+)/m);
+        const dataMatch  = chunk.match(/^data:\s*(.+)/m);
+        if (!dataMatch) continue;
+        const evtName = eventMatch ? eventMatch[1] : 'message';
+        let d;
+        try { d = JSON.parse(dataMatch[1]); } catch { continue; }
+
+        if (evtName === 'status') {
+          pills.innerHTML = `<span style="color:#6b7280;font-size:0.82rem">${escHtml(d.msg)}</span>`;
+        } else if (evtName === 'domains') {
+          pills.innerHTML = d.domains.map(name =>
+            `<span class="domain-pill" id="pill-${cssId(name)}">
+              <span class="pill-dot"></span>${escHtml(name)}
+            </span>`
           ).join('');
+        } else if (evtName === 'searching') {
+          document.querySelectorAll('.domain-pill.searching').forEach(p => {
+            p.classList.remove('searching'); p.classList.add('done');
+          });
+          const pill = document.getElementById('pill-' + cssId(d.domain));
+          if (pill) pill.classList.add('searching');
+        } else if (evtName === 'card') {
+          header.classList.add('visible');
+          const div = document.createElement('div');
+          div.innerHTML = buildCard(d);
+          container.appendChild(div.firstElementChild);
+        } else if (evtName === 'error') {
+          showError(d.msg || '出错了');
+        } else if (evtName === 'done') {
+          break;
+        }
       }
-
-      setProgress(100, '完成');
-      setTimeout(() => {
-        renderResults(data);
-        statusBar.classList.remove('visible');
-        results.classList.add('visible');
-      }, 400);
-
-    } catch (e) {
-      errorMsg.textContent = '出错了：' + e.message;
-      errorMsg.classList.add('visible');
-      statusBar.classList.remove('visible');
-    } finally {
-      btn.disabled = false;
     }
+  } catch (e) {
+    if (e.name !== 'AbortError') showError(e.message);
+  } finally {
+    finalize();
   }
+}
 
-  function setProgress(pct, label) {
-    document.getElementById('progressFill').style.width = pct + '%';
-    document.getElementById('progressLabel').textContent = label;
-  }
-
-  function animateProgress(from, to, duration) {
-    const start = Date.now();
-    return setInterval(() => {
-      const elapsed = Date.now() - start;
-      const frac = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - frac, 3);
-      setProgress(from + (to - from) * eased, '正在搜索对立领域内容...');
-    }, 100);
-  }
-
-  function renderResults(data) {
-    const container = document.getElementById('cardContainer');
-    if (!data.recommendations?.length) {
-      container.innerHTML = '<p style="color:#4a4a5a;text-align:center;padding:40px 0">没有找到合适的反推荐内容，试试换个描述</p>';
-      return;
-    }
-    container.innerHTML = data.recommendations.map(item => `
-      <div class="card">
-        <div class="card-domain">${escHtml(item.domain)}</div>
-        <div class="card-title">${escHtml(item.title)}</div>
-        <div class="card-hook">"${escHtml(item.hook)}"</div>
-        <div class="card-meta">
-          <div class="meta-block">
-            <div class="meta-label">为什么你不会自己找到</div>
-            <div class="meta-text">${escHtml(item.why_wont_find)}</div>
-          </div>
-          <div class="meta-block">
-            <div class="meta-label">隐藏的桥梁</div>
-            <div class="meta-text">${escHtml(item.bridge)}</div>
-          </div>
+function buildCard(item) {
+  const saved = isBookmarked(item.url);
+  const itemJson = escAttr(JSON.stringify(item));
+  return `
+    <div class="card">
+      <div class="card-domain">${escHtml(item.domain)}</div>
+      <div class="card-title">${escHtml(item.title)}</div>
+      <div class="card-hook">"${escHtml(item.hook)}"</div>
+      <div class="card-meta">
+        <div class="meta-block">
+          <div class="meta-label">为什么你不会自己找到</div>
+          <div class="meta-text">${escHtml(item.why_wont_find)}</div>
         </div>
-        <div class="card-footer">
-          <div class="score-badge">
-            意外程度
-            <span class="score-dots">
-              ${Array.from({length: 10}, (_, i) =>
-                `<span class="dot ${i < item.score ? 'active' : ''}"></span>`
-              ).join('')}
-            </span>
-          </div>
+        <div class="meta-block">
+          <div class="meta-label">隐藏的桥梁</div>
+          <div class="meta-text">${escHtml(item.bridge)}</div>
+        </div>
+      </div>
+      <div class="card-footer">
+        <div class="score-badge">
+          意外程度
+          <span class="score-dots">
+            ${Array.from({length:10},(_,i)=>`<span class="dot${i<item.score?' active':''}"></span>`).join('')}
+          </span>
+        </div>
+        <div class="card-actions">
+          <button
+            class="save-btn${saved?' saved':''}"
+            data-url="${escHtml(item.url)}"
+            data-item="${itemJson}"
+            onclick="handleSave(this)"
+          >${saved?'★ 已收藏':'☆ 收藏'}</button>
           <a class="read-link" href="${escHtml(item.url)}" target="_blank" rel="noopener">阅读 →</a>
         </div>
       </div>
-    `).join('');
-  }
+    </div>`;
+}
 
-  function escHtml(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+function handleSave(btn) {
+  const item = JSON.parse(btn.dataset.item);
+  const added = toggleBookmark(item);
+  btn.classList.toggle('saved', added);
+  btn.textContent = added ? '★ 已收藏' : '☆ 收藏';
+}
 
-  document.getElementById('bubbleInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') startRecommend();
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = '出错了：' + msg;
+  el.classList.add('visible');
+}
+
+function cssId(s) { return s.replace(/[^a-zA-Z0-9一-龥]/g,'_'); }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function escAttr(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+document.getElementById('bubbleInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startRecommend();
+});
+
+// ── Douyin import ──
+let douyinSource = null;
+
+function importDouyin() {
+  if (douyinSource) { douyinSource.close(); douyinSource = null; }
+
+  const btn = document.getElementById('douyinBtn');
+  const statusEl = document.getElementById('douyinStatus');
+  btn.disabled = true;
+  statusEl.className = 'douyin-status';
+  setDouyinStatus('spin', '正在打开浏览器...');
+
+  const es = new EventSource('/douyin-stream');
+  douyinSource = es;
+
+  es.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    const isError = d.step === 'error';
+    setDouyinStatus(isError ? 'x' : 'spin', d.msg);
+    if (isError) { cleanup(); }
   });
+
+  es.addEventListener('bubble', e => {
+    const d = JSON.parse(e.data);
+    document.getElementById('bubbleInput').value = d.bubble;
+    setDouyinStatus('check', `已从 ${d.count} 条点赞中提取茧房画像`);
+    statusEl.className = 'douyin-status success';
+  });
+
+  es.addEventListener('error', e => {
+    try {
+      const d = JSON.parse(e.data);
+      setDouyinStatus('x', d.msg);
+      statusEl.className = 'douyin-status error';
+    } catch {}
+    cleanup();
+  });
+
+  es.addEventListener('done', e => { cleanup(); });
+  es.onerror = () => { cleanup(); };
+
+  function cleanup() {
+    btn.disabled = false;
+    if (douyinSource) { douyinSource.close(); douyinSource = null; }
+  }
+}
+
+function setDouyinStatus(icon, msg) {
+  const el = document.getElementById('douyinStatus');
+  const iconHtml = icon === 'spin'
+    ? '<span class="spin"></span>'
+    : icon === 'check' ? '✓' : icon === 'x' ? '✕' : '';
+  el.innerHTML = `${iconHtml}<span>${escHtml(msg)}</span>`;
+}
+
+// init
+updateBookmarkUI();
 </script>
 </body>
 </html>
