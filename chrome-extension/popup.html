@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 320px;
+    font-family: -apple-system, sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #a78bfa, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 4px;
+  }
+  .sub { font-size: 0.75rem; color: #4a4a5a; margin-bottom: 16px; }
+
+  .stat { font-size: 0.82rem; color: #6b7280; margin-bottom: 12px; }
+  .stat span { color: #a78bfa; font-weight: 600; }
+
+  .bubble-box {
+    background: #12121a;
+    border: 1px solid #2d2d3d;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 0.85rem;
+    color: #c4c4d4;
+    line-height: 1.5;
+    min-height: 48px;
+    margin-bottom: 14px;
+    word-break: break-all;
+  }
+  .bubble-box.empty { color: #3a3a4a; font-style: italic; }
+
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: linear-gradient(135deg, #7c5cfc, #38bdf8); color: white; }
+  .btn-secondary {
+    background: transparent;
+    border: 1px solid #2d2d3d;
+    color: #7c7c9a;
+  }
+  .btn-secondary:hover { border-color: #7c5cfc; color: #a78bfa; }
+
+  .status {
+    font-size: 0.78rem;
+    min-height: 18px;
+    text-align: center;
+    margin-top: 4px;
+  }
+  .status.ok { color: #34d399; }
+  .status.err { color: #f87171; }
+  .status.loading { color: #7c5cfc; }
+
+  .open-link {
+    display: block;
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.78rem;
+    color: #4a4a5a;
+    text-decoration: none;
+  }
+  .open-link:hover { color: #a78bfa; }
+</style>
+</head>
+<body>
+<h1>反推荐引擎</h1>
+<div class="sub">茧房探测器</div>
+
+<div class="stat">已收集 <span id="histCount">-</span> 条浏览记录</div>
+
+<div style="font-size:0.72rem;color:#4a4a5a;margin-bottom:6px;">当前茧房分析</div>
+<div class="bubble-box empty" id="bubbleBox">尚未分析</div>
+
+<button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">分析我的茧房</button>
+<button class="btn btn-secondary" id="sendBtn" onclick="sendToApp()" disabled>发送到反推荐引擎</button>
+
+<div class="status" id="status"></div>
+<a class="open-link" href="http://localhost:8768" target="_blank">打开反推荐引擎 →</a>
+
+<script src="popup.js"></script>
+</body>
+</html>

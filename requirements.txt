@@ -4,3 +4,7 @@ anthropic==0.34.2
 httpx==0.27.2
 python-dotenv==1.0.1
 ddgs>=0.1.0
+playwright
+playwright-stealth
+apscheduler
+beautifulsoup4

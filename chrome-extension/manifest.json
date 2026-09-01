@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "反推荐引擎 · 茧房探测器",
+  "version": "1.0",
+  "description": "被动记录浏览习惯，自动分析信息茧房",
+  "permissions": ["history", "storage", "tabs"],
+  "host_permissions": ["http://localhost:8768/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "反推荐引擎"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

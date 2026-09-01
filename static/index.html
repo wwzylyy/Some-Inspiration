@@ -116,7 +116,7 @@
       margin-top: 10px;
     }
     .hint { font-size: 0.82rem; color: #4a4a5a; }
-    .douyin-btn {
+    .douyin-btn, .xhs-btn {
       display: flex;
       align-items: center;
       gap: 6px;
@@ -124,14 +124,47 @@
       background: transparent;
       border: 1px solid #2d2d3d;
       border-radius: 8px;
-      color: #6060a0;
       font-size: 0.82rem;
       cursor: pointer;
-      transition: border-color 0.2s, color 0.2s;
       white-space: nowrap;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.25s cubic-bezier(0.22,1,0.36,1),
+                  box-shadow 0.25s ease,
+                  border-color 0.2s, color 0.2s;
     }
-    .douyin-btn:hover { border-color: #fe2c55aa; color: #fe2c55; }
-    .douyin-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .douyin-btn { color: #6060a0; }
+    .xhs-btn    { color: #6060a0; }
+
+    .douyin-btn::after, .xhs-btn::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 9px;
+      padding: 1px;
+      background: conic-gradient(from var(--angle), #7c5cfc, #38bdf8, #34d399, #a78bfa, #7c5cfc);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s;
+      animation: border-spin 2.5s linear infinite;
+      pointer-events: none;
+    }
+
+    .douyin-btn:hover, .xhs-btn:hover {
+      transform: scale(1.08) translateY(-3px);
+      box-shadow: 0 8px 24px rgba(124,92,252,0.2), 0 2px 8px rgba(56,189,248,0.1);
+    }
+    .douyin-btn:hover::after, .xhs-btn:hover::after { opacity: 1; }
+
+    .douyin-btn:active, .xhs-btn:active {
+      transform: scale(1.03) translateY(-1px);
+    }
+    .douyin-btn:disabled, .xhs-btn:disabled {
+      opacity: 0.4; cursor: not-allowed;
+      transform: none !important; box-shadow: none !important;
+    }
     .douyin-icon { font-size: 0.9rem; }
 
     .douyin-status {
@@ -204,14 +237,166 @@
       padding: 0 24px;
     }
     .results-header {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .results-header.visible { display: flex; }
+    .results-title {
       font-size: 0.82rem;
       color: #4a4a5a;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      margin-bottom: 20px;
-      display: none;
     }
-    .results-header.visible { display: block; }
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+    }
+    .view-btn {
+      padding: 5px 12px;
+      background: transparent;
+      border: 1px solid #2d2d3d;
+      border-radius: 7px;
+      color: #5a5a7a;
+      font-size: 0.78rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+    .view-btn:hover { border-color: #7c5cfc44; color: #a78bfa; }
+    .view-btn.active { background: #7c5cfc22; border-color: #7c5cfc; color: #a78bfa; }
+
+    /* ── swipe overlay ── */
+    .swipe-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 5, 10, 0.97);
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .swipe-overlay.open { display: flex; }
+
+    .swipe-counter {
+      font-size: 0.78rem;
+      color: #4a4a5a;
+      margin-bottom: 18px;
+      letter-spacing: 0.1em;
+    }
+    .swipe-stage {
+      position: relative;
+      width: 420px;
+      max-width: 90vw;
+      height: 460px;
+    }
+    .swipe-card {
+      position: absolute;
+      inset: 0;
+      background: #12121a;
+      border: 1px solid #2d2d3d;
+      border-radius: 20px;
+      padding: 28px;
+      cursor: grab;
+      user-select: none;
+      transform-origin: center bottom;
+      transition: box-shadow 0.2s;
+      will-change: transform;
+      overflow: hidden;
+    }
+    .swipe-card:active { cursor: grabbing; }
+    .swipe-card.behind {
+      transform: scale(0.94) translateY(12px);
+      filter: brightness(0.6);
+      pointer-events: none;
+    }
+    .swipe-hint {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+      width: 420px;
+      max-width: 90vw;
+    }
+    .swipe-hint-left  { font-size: 0.82rem; color: #f8717155; }
+    .swipe-hint-right { font-size: 0.82rem; color: #34d39955; }
+    .swipe-label {
+      font-size: 0.75rem;
+      color: #4a4a5a;
+      text-align: center;
+    }
+
+    .swipe-action-label {
+      position: absolute;
+      top: 24px;
+      font-size: 1.4rem;
+      font-weight: 800;
+      border: 3px solid;
+      border-radius: 8px;
+      padding: 4px 12px;
+      opacity: 0;
+      transition: opacity 0.1s;
+      pointer-events: none;
+    }
+    .swipe-action-label.skip  { left: 24px; color: #f87171; border-color: #f87171; transform: rotate(-12deg); }
+    .swipe-action-label.save  { right: 24px; color: #34d399; border-color: #34d399; transform: rotate(12deg); }
+
+    .swipe-close {
+      position: fixed;
+      top: 20px; right: 24px;
+      width: 36px; height: 36px;
+      background: #16161f;
+      border: 1px solid #2d2d3d;
+      border-radius: 50%;
+      color: #7c7c9a;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 301;
+    }
+    .swipe-close:hover { color: #d4d4e4; border-color: #5a5a7a; }
+
+    /* ── visualization overlay ── */
+    .viz-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0f;
+      z-index: 300;
+      display: none;
+      flex-direction: column;
+    }
+    .viz-overlay.open { display: flex; }
+    .viz-close {
+      position: absolute;
+      top: 20px; right: 24px;
+      width: 36px; height: 36px;
+      background: #16161f;
+      border: 1px solid #2d2d3d;
+      border-radius: 50%;
+      color: #7c7c9a;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1;
+    }
+    .viz-close:hover { color: #d4d4e4; }
+    #vizCanvas { flex: 1; width: 100%; }
+    .viz-tooltip {
+      position: fixed;
+      background: #1a1a2e;
+      border: 1px solid #2d2d3d;
+      border-radius: 10px;
+      padding: 10px 14px;
+      max-width: 260px;
+      font-size: 0.82rem;
+      pointer-events: none;
+      display: none;
+      z-index: 302;
+    }
+    .viz-tooltip-domain { font-size: 0.7rem; color: #7c5cfc; text-transform: uppercase; margin-bottom: 4px; }
+    .viz-tooltip-title  { color: #d4d4e4; margin-bottom: 6px; font-weight: 600; }
+    .viz-tooltip-hook   { color: #9090aa; font-style: italic; }
 
     /* ── card ── */
     @keyframes card-in {
@@ -441,6 +626,97 @@
     }
     .drawer-clear:hover { border-color: #f8717144; color: #f87171; }
 
+    /* ── sci-fi effects ── */
+    #bgCanvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+    #noiseOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      pointer-events: none;
+      opacity: 0.028;
+      background-repeat: repeat;
+      background-size: 160px 160px;
+    }
+
+    #progressBeam {
+      position: fixed;
+      top: 0; left: 0;
+      height: 2px;
+      width: 0%;
+      background: linear-gradient(90deg, #7c5cfc, #38bdf8, #34d399);
+      box-shadow: 0 0 8px rgba(124,92,252,0.7), 0 0 2px rgba(56,189,248,0.5);
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body { cursor: none; }
+    #cursorDot {
+      position: fixed;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #a78bfa;
+      box-shadow: 0 0 8px rgba(167,139,250,0.9), 0 0 18px rgba(167,139,250,0.45);
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+    }
+    .cursor-trail {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      background: rgba(167,139,250,0.3);
+    }
+
+    .card-shine {
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      opacity: 0;
+      transition: opacity 0.15s;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .card { will-change: transform; }
+    .card:hover { border-color: transparent; transform: none; }
+
+    @keyframes glitch {
+      0%, 87%, 90%, 92%, 100% {
+        filter: drop-shadow(0 0 5px rgba(167,139,250,0.9))
+                drop-shadow(0 0 18px rgba(124,92,252,0.55))
+                drop-shadow(0 0 42px rgba(124,92,252,0.22));
+        transform: none;
+      }
+      44% {
+        filter: drop-shadow(0 0 9px rgba(167,139,250,1))
+                drop-shadow(0 0 28px rgba(124,92,252,0.75))
+                drop-shadow(0 0 64px rgba(56,189,248,0.3));
+        transform: none;
+      }
+      88% {
+        filter: drop-shadow(-2px 0 rgba(255,36,66,.95)) drop-shadow(2px 0 rgba(56,189,248,.95))
+                drop-shadow(0 0 12px rgba(255,36,66,0.4));
+        transform: translate(2px);
+      }
+      89% {
+        filter: drop-shadow(2px 0 rgba(255,36,66,.95)) drop-shadow(-2px 0 rgba(56,189,248,.95))
+                drop-shadow(0 0 12px rgba(56,189,248,0.4));
+        transform: translate(-2px) skewX(-1.5deg);
+      }
+      91% {
+        filter: drop-shadow(-1px 0 rgba(167,139,250,.9)) drop-shadow(0 0 14px rgba(167,139,250,0.8));
+        transform: translate(1px,1px);
+      }
+    }
+    .hero h1 { animation: glitch 9s ease-in-out infinite; }
+
     .error-msg {
       max-width: 600px;
       margin: 28px auto;
@@ -453,9 +729,123 @@
       display: none;
     }
     .error-msg.visible { display: block; }
+
+    /* ── explored topics bar ── */
+    .explored-bar {
+      max-width: 600px;
+      margin: 10px auto 0;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 24px;
+    }
+    .explored-label {
+      font-size: 0.78rem;
+      color: #38bdf866;
+    }
+    .explored-reset {
+      font-size: 0.75rem;
+      color: #4a4a5a;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 1px 6px;
+      transition: color 0.2s;
+    }
+    .explored-reset:hover { color: #f87171; }
+
+    /* ── subscribe / save bubble section ── */
+    .subscribe-section {
+      max-width: 600px;
+      margin: 14px auto 0;
+      padding: 0 24px;
+    }
+    .subscribe-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.82rem;
+      color: #4a4a5a;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 6px 0;
+      transition: color 0.2s;
+    }
+    .subscribe-toggle:hover { color: #a78bfa; }
+    .subscribe-form {
+      display: none;
+      margin-top: 8px;
+      padding: 14px 16px;
+      background: #12121a;
+      border: 1px solid #1e1e2e;
+      border-radius: 12px;
+    }
+    .subscribe-form.open { display: block; }
+    .subscribe-btn {
+      padding: 9px 18px;
+      background: linear-gradient(135deg, #7c5cfc44, #38bdf844);
+      border: 1px solid #7c5cfc66;
+      border-radius: 8px;
+      color: #a78bfa;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .subscribe-btn:hover { background: linear-gradient(135deg, #7c5cfc66, #38bdf866); border-color: #7c5cfc; }
+    .subscribe-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .subscribe-hint { margin-top: 8px; font-size: 0.78rem; color: #4a4a5a; }
+    .subscribe-msg { margin-top: 8px; font-size: 0.82rem; display: none; }
+    .subscribe-msg.ok { color: #34d399; display: block; }
+    .subscribe-msg.err { color: #f87171; display: block; }
+
+    /* ── daily digest section ── */
+    .daily-section {
+      max-width: 760px;
+      margin: 36px auto 0;
+      padding: 0 24px;
+      display: none;
+    }
+    .daily-section.visible { display: block; }
+    .daily-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .daily-title {
+      font-size: 0.82rem;
+      color: #38bdf8;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .daily-date { font-size: 0.75rem; color: #4a4a5a; }
+    .daily-refresh {
+      font-size: 0.75rem;
+      color: #4a4a5a;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 6px;
+      transition: color 0.2s;
+    }
+    .daily-refresh:hover { color: #a78bfa; }
   </style>
 </head>
 <body>
+<canvas id="bgCanvas"></canvas>
+<div id="noiseOverlay"></div>
+<div id="progressBeam"></div>
+<div id="cursorDot"></div>
+<div class="cursor-trail"></div>
+<div class="cursor-trail"></div>
+<div class="cursor-trail"></div>
+<div class="cursor-trail"></div>
+<div class="cursor-trail"></div>
+<div class="cursor-trail"></div>
 
 <!-- top bar -->
 <div class="topbar">
@@ -484,11 +874,43 @@
   </div>
   <div class="input-bottom">
     <span class="hint">可以用中文或英文描述你平时读什么、关注什么</span>
-    <button class="douyin-btn" id="douyinBtn" onclick="importDouyin()">
-      <span class="douyin-icon">🎵</span> 从抖音导入
-    </button>
+    <div style="display:flex;gap:7px;">
+      <button class="douyin-btn" id="douyinBtn" onclick="importDouyin()">
+        <span class="douyin-icon">🎵</span> 抖音导入
+      </button>
+      <button class="xhs-btn" id="xhsBtn" onclick="importXhs()">
+        <span>📕</span> 小红书导入
+      </button>
+    </div>
   </div>
   <div class="douyin-status" id="douyinStatus"></div>
+</div>
+
+<!-- explored topics bar -->
+<div class="explored-bar" id="exploredBar"></div>
+
+<!-- subscribe section -->
+<div class="subscribe-section">
+  <button class="subscribe-toggle" onclick="toggleSubscribe()">
+    <span id="subToggleIcon">▸</span> 开启每日推送（每天早上8点自动生成）
+  </button>
+  <div class="subscribe-form" id="subscribeForm">
+    <button class="subscribe-btn" id="subBtn" onclick="doSaveBubble()">保存当前茧房描述，开启每日推送</button>
+    <div class="subscribe-hint">系统每天早上8点自动跑一次，打开页面就能看到今日推送，不需要邮箱</div>
+    <div class="subscribe-msg" id="subMsg"></div>
+  </div>
+</div>
+
+<!-- daily digest display -->
+<div class="daily-section" id="dailySection">
+  <div class="daily-header">
+    <span class="daily-title">今日推送</span>
+    <span>
+      <span class="daily-date" id="dailyDate"></span>
+      <button class="daily-refresh" onclick="refreshDaily()">↺ 立即刷新</button>
+    </span>
+  </div>
+  <div id="dailyCards"></div>
 </div>
 
 <!-- live domain feed -->
@@ -501,8 +923,38 @@
 
 <!-- results -->
 <div class="results">
-  <div class="results-header" id="resultsHeader">反推荐结果</div>
+  <div class="results-header" id="resultsHeader">
+    <span class="results-title">反推荐结果</span>
+    <div class="view-toggle">
+      <button class="view-btn active" id="btnList"     onclick="setView('list')">列表</button>
+      <button class="view-btn"        id="btnSwipe"    onclick="setView('swipe')">滑动</button>
+      <button class="view-btn"        id="btnViz"      onclick="setView('viz')">宇宙图</button>
+    </div>
+  </div>
   <div id="cardContainer"></div>
+</div>
+
+<!-- swipe overlay -->
+<div class="swipe-overlay" id="swipeOverlay">
+  <button class="swipe-close" onclick="closeSwipe()">✕</button>
+  <div class="swipe-counter" id="swipeCounter"></div>
+  <div class="swipe-stage" id="swipeStage"></div>
+  <div class="swipe-hint">
+    <span class="swipe-hint-left">← 跳过</span>
+    <span class="swipe-label">拖动 / 键盘左右键</span>
+    <span class="swipe-hint-right">收藏 →</span>
+  </div>
+</div>
+
+<!-- viz overlay -->
+<div class="viz-overlay" id="vizOverlay">
+  <button class="viz-close" onclick="closeViz()">✕</button>
+  <canvas id="vizCanvas"></canvas>
+  <div class="viz-tooltip" id="vizTooltip">
+    <div class="viz-tooltip-domain" id="ttDomain"></div>
+    <div class="viz-tooltip-title"  id="ttTitle"></div>
+    <div class="viz-tooltip-hook"   id="ttHook"></div>
+  </div>
 </div>
 
 <!-- bookmark drawer -->
@@ -518,6 +970,7 @@
 <script>
 // ── bookmarks ──
 const STORAGE_KEY = 'anti-rec-bookmarks';
+const EXPLORED_KEY = 'anti-rec-explored';
 
 function loadBookmarks() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
@@ -595,6 +1048,104 @@ function toggleDrawer() {
   if (drawerOpen) renderDrawer();
 }
 
+// ── explored topics ──
+function loadExplored() {
+  try { return JSON.parse(localStorage.getItem(EXPLORED_KEY) || '[]'); } catch { return []; }
+}
+function saveExplored(list) {
+  localStorage.setItem(EXPLORED_KEY, JSON.stringify(list));
+}
+function addExplored(domains) {
+  const list = loadExplored();
+  domains.forEach(d => { if (!list.includes(d)) list.push(d); });
+  saveExplored(list);
+  renderExploredBar();
+}
+function renderExploredBar() {
+  const list = loadExplored();
+  const bar = document.getElementById('exploredBar');
+  if (!list.length) { bar.innerHTML = ''; return; }
+  bar.innerHTML = `<span class="explored-label">已探索 ${list.length} 个领域，下次自动避开</span>
+    <button class="explored-reset" onclick="resetExplored()">重置</button>`;
+}
+function resetExplored() {
+  saveExplored([]);
+  renderExploredBar();
+}
+
+// ── subscribe / save bubble ──
+let subOpen = false;
+function toggleSubscribe() {
+  subOpen = !subOpen;
+  document.getElementById('subscribeForm').classList.toggle('open', subOpen);
+  document.getElementById('subToggleIcon').textContent = subOpen ? '▾' : '▸';
+}
+async function doSaveBubble() {
+  const bubble = document.getElementById('bubbleInput').value.trim();
+  const msg = document.getElementById('subMsg');
+  const btn = document.getElementById('subBtn');
+  msg.className = 'subscribe-msg';
+  if (!bubble) {
+    msg.textContent = '请先在上方输入你的茧房描述';
+    msg.className = 'subscribe-msg err';
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/save-bubble', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ bubble })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      msg.textContent = data.msg;
+      msg.className = 'subscribe-msg ok';
+    } else {
+      msg.textContent = data.detail || '保存失败';
+      msg.className = 'subscribe-msg err';
+    }
+  } catch (e) {
+    msg.textContent = '网络错误：' + e.message;
+    msg.className = 'subscribe-msg err';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── daily digest ──
+async function loadDaily() {
+  try {
+    const resp = await fetch('/daily');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.items || !data.items.length) return;
+    const section = document.getElementById('dailySection');
+    const container = document.getElementById('dailyCards');
+    const dateEl = document.getElementById('dailyDate');
+    dateEl.textContent = data.date ? `${data.date} · ${data.bubble}` : '';
+    container.innerHTML = data.items.map(item => buildCard(item)).join('');
+    container.querySelectorAll('.card').forEach(attachHoloEffect);
+    section.classList.add('visible');
+  } catch {}
+}
+
+async function refreshDaily() {
+  const btn = document.querySelector('.daily-refresh');
+  btn.textContent = '生成中...';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/daily/refresh', { method: 'POST' });
+    const data = await resp.json();
+    if (resp.ok) {
+      setTimeout(() => { loadDaily(); btn.textContent = '↺ 立即刷新'; btn.disabled = false; }, 30000);
+    } else {
+      alert(data.detail || '刷新失败');
+      btn.textContent = '↺ 立即刷新'; btn.disabled = false;
+    }
+  } catch { btn.textContent = '↺ 立即刷新'; btn.disabled = false; }
+}
+
 // ── streaming recommend (fetch-based, no EventSource reconnect issues) ──
 let streamAbort = null;
 
@@ -612,6 +1163,7 @@ async function startRecommend() {
   const errorMsg = document.getElementById('errorMsg');
 
   btn.disabled = true;
+  beamStart();
   feed.classList.add('visible');
   pills.innerHTML = `<span style="color:#6b7280;font-size:0.82rem">正在分析茧房...</span>`;
   header.classList.remove('visible');
@@ -621,19 +1173,25 @@ async function startRecommend() {
   const ctrl = new AbortController();
   streamAbort = ctrl;
 
+  const sessionDomains = [];
+  resultItems = [];  // reset buffer
+
   function finalize() {
     btn.disabled = false;
     streamAbort = null;
+    beamDone();
     document.querySelectorAll('.domain-pill.searching').forEach(p => {
       p.classList.remove('searching');
       p.classList.add('done');
     });
+    if (sessionDomains.length) addExplored(sessionDomains);
   }
 
+  const explored = loadExplored().join(',');
+  const url = `/stream?bubble=${encodeURIComponent(bubble)}${explored ? '&explored=' + encodeURIComponent(explored) : ''}`;
+
   try {
-    const resp = await fetch(`/stream?bubble=${encodeURIComponent(bubble)}`, {
-      signal: ctrl.signal,
-    });
+    const resp = await fetch(url, { signal: ctrl.signal });
     if (!resp.ok) { showError('服务器错误 ' + resp.status); finalize(); return; }
 
     const reader = resp.body.getReader();
@@ -657,6 +1215,7 @@ async function startRecommend() {
         if (evtName === 'status') {
           pills.innerHTML = `<span style="color:#6b7280;font-size:0.82rem">${escHtml(d.msg)}</span>`;
         } else if (evtName === 'domains') {
+          d.domains.forEach(n => sessionDomains.push(n));
           pills.innerHTML = d.domains.map(name =>
             `<span class="domain-pill" id="pill-${cssId(name)}">
               <span class="pill-dot"></span>${escHtml(name)}
@@ -670,9 +1229,12 @@ async function startRecommend() {
           if (pill) pill.classList.add('searching');
         } else if (evtName === 'card') {
           header.classList.add('visible');
+          resultItems.push(d);
           const div = document.createElement('div');
           div.innerHTML = buildCard(d);
-          container.appendChild(div.firstElementChild);
+          const cardEl = div.firstElementChild;
+          container.appendChild(cardEl);
+          attachHoloEffect(cardEl);
         } else if (evtName === 'error') {
           showError(d.msg || '出错了');
         } else if (evtName === 'done') {
@@ -719,9 +1281,11 @@ function buildCard(item) {
             data-item="${itemJson}"
             onclick="handleSave(this)"
           >${saved?'★ 已收藏':'☆ 收藏'}</button>
-          <a class="read-link" href="${escHtml(item.url)}" target="_blank" rel="noopener">阅读 →</a>
+          <a class="read-link" href="${escHtml(item.url)}" target="_blank" rel="noopener"
+             onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}')">阅读 →</a>
         </div>
       </div>
+      <div class="card-shine"></div>
     </div>`;
 }
 
@@ -805,8 +1369,473 @@ function setDouyinStatus(icon, msg) {
   el.innerHTML = `${iconHtml}<span>${escHtml(msg)}</span>`;
 }
 
+// ── Xiaohongshu import ──
+let xhsSource = null;
+
+function importXhs() {
+  if (xhsSource) { xhsSource.close(); xhsSource = null; }
+
+  const btn = document.getElementById('xhsBtn');
+  const statusEl = document.getElementById('douyinStatus');
+  btn.disabled = true;
+  document.getElementById('douyinBtn').disabled = true;
+  statusEl.className = 'douyin-status';
+  setDouyinStatus('spin', '正在打开小红书...');
+
+  const es = new EventSource('/xhs-stream');
+  xhsSource = es;
+
+  es.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    const isError = d.step === 'error';
+    setDouyinStatus(isError ? 'x' : 'spin', d.msg);
+    if (isError) cleanup();
+  });
+
+  es.addEventListener('bubble', e => {
+    const d = JSON.parse(e.data);
+    document.getElementById('bubbleInput').value = d.bubble;
+    setDouyinStatus('check', `已从 ${d.count} 条笔记中提取茧房画像`);
+    statusEl.className = 'douyin-status success';
+  });
+
+  es.addEventListener('error', e => {
+    try {
+      const d = JSON.parse(e.data);
+      setDouyinStatus('x', d.msg);
+      statusEl.className = 'douyin-status error';
+    } catch {}
+    cleanup();
+  });
+
+  es.addEventListener('done', () => cleanup());
+  es.onerror = () => cleanup();
+
+  function cleanup() {
+    btn.disabled = false;
+    document.getElementById('douyinBtn').disabled = false;
+    if (xhsSource) { xhsSource.close(); xhsSource = null; }
+  }
+}
+
+// ── feedback tracking ──
+function trackRead(url, domain) {
+  fetch('/feedback', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url, domain, action: 'read' })
+  }).catch(() => {});
+}
+function trackSkip(url, domain) {
+  fetch('/feedback', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ url, domain, action: 'skip' })
+  }).catch(() => {});
+}
+
+// ── result items buffer (for swipe + viz) ──
+let resultItems = [];
+
+// ── view mode ──
+function setView(mode) {
+  ['list','swipe','viz'].forEach(m => document.getElementById('btn'+m.charAt(0).toUpperCase()+m.slice(1)).classList.toggle('active', m === mode));
+  if (mode === 'swipe') openSwipe();
+  else if (mode === 'viz') openViz();
+}
+
+// ── swipe ──
+let swipeIdx = 0;
+let swipeDragging = false;
+let swipeDragX = 0;
+let swipeStartX = 0;
+let swipeCard = null;
+
+function openSwipe() {
+  if (!resultItems.length) return;
+  swipeIdx = 0;
+  document.getElementById('swipeOverlay').classList.add('open');
+  renderSwipeCard();
+}
+function closeSwipe() {
+  document.getElementById('swipeOverlay').classList.remove('open');
+  document.getElementById('btnList').click();
+}
+
+function renderSwipeCard() {
+  const stage = document.getElementById('swipeStage');
+  const counter = document.getElementById('swipeCounter');
+  stage.innerHTML = '';
+  if (swipeIdx >= resultItems.length) {
+    stage.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4a4a5a;font-size:1rem;">已全部浏览完</div>`;
+    counter.textContent = '';
+    return;
+  }
+  counter.textContent = `${swipeIdx + 1} / ${resultItems.length}`;
+
+  // Behind card (peek)
+  if (swipeIdx + 1 < resultItems.length) {
+    const behind = buildSwipeCardEl(resultItems[swipeIdx + 1]);
+    behind.classList.add('behind');
+    stage.appendChild(behind);
+  }
+
+  // Front card
+  const front = buildSwipeCardEl(resultItems[swipeIdx]);
+  front.innerHTML += `<div class="swipe-action-label skip" id="lblSkip">跳过</div>`;
+  front.innerHTML += `<div class="swipe-action-label save" id="lblSave">收藏</div>`;
+  stage.appendChild(front);
+  swipeCard = front;
+  attachSwipeDrag(front);
+}
+
+function buildSwipeCardEl(item) {
+  const div = document.createElement('div');
+  div.className = 'swipe-card';
+  div.innerHTML = `
+    <div class="card-domain">${escHtml(item.domain)}</div>
+    <div class="card-title" style="font-size:1.15rem;margin-bottom:14px">${escHtml(item.title)}</div>
+    <div class="card-hook" style="margin-bottom:18px">"${escHtml(item.hook)}"</div>
+    <div class="card-meta">
+      <div class="meta-block">
+        <div class="meta-label">为什么你不会自己找到</div>
+        <div class="meta-text">${escHtml(item.why_wont_find)}</div>
+      </div>
+      <div class="meta-block">
+        <div class="meta-label">隐藏的桥梁</div>
+        <div class="meta-text">${escHtml(item.bridge)}</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto">
+      <span class="score-dots">${Array.from({length:10},(_,i)=>`<span class="dot${i<item.score?' active':''}"></span>`).join('')}</span>
+      <a href="${escHtml(item.url)}" target="_blank" rel="noopener"
+         style="color:#a78bfa;font-size:0.85rem;text-decoration:none"
+         onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}')">阅读 →</a>
+    </div>`;
+  div.dataset.item = JSON.stringify(item);
+  return div;
+}
+
+function attachSwipeDrag(card) {
+  let startX = 0, curX = 0;
+
+  const onStart = e => {
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    card.style.transition = 'none';
+  };
+  const onMove = e => {
+    curX = (e.touches ? e.touches[0].clientX : e.clientX) - startX;
+    const rot = curX / 20;
+    card.style.transform = `translateX(${curX}px) rotate(${rot}deg)`;
+    const skip = card.querySelector('#lblSkip');
+    const save = card.querySelector('#lblSave');
+    if (skip) skip.style.opacity = Math.max(0, -curX / 80);
+    if (save) save.style.opacity = Math.max(0, curX / 80);
+    e.preventDefault();
+  };
+  const onEnd = () => {
+    card.style.transition = 'transform 0.3s ease';
+    if (curX > 80) swipeDecide(true);
+    else if (curX < -80) swipeDecide(false);
+    else { card.style.transform = ''; curX = 0; }
+  };
+
+  card.addEventListener('mousedown', onStart);
+  card.addEventListener('touchstart', onStart, { passive: true });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('mouseup', onEnd, { once: true });
+  window.addEventListener('touchend', onEnd, { once: true });
+}
+
+function swipeDecide(saved) {
+  const item = resultItems[swipeIdx];
+  if (saved) {
+    toggleBookmark(item);
+    swipeCard.style.transform = `translateX(120%) rotate(20deg)`;
+  } else {
+    trackSkip(item.url, item.domain);
+    swipeCard.style.transform = `translateX(-120%) rotate(-20deg)`;
+  }
+  swipeIdx++;
+  setTimeout(renderSwipeCard, 320);
+}
+
+// Keyboard navigation for swipe
+window.addEventListener('keydown', e => {
+  if (!document.getElementById('swipeOverlay').classList.contains('open')) return;
+  if (e.key === 'ArrowRight') swipeDecide(true);
+  if (e.key === 'ArrowLeft')  swipeDecide(false);
+  if (e.key === 'Escape')     closeSwipe();
+});
+
+// ── visualization ──
+const DOMAIN_COLORS = ['#a78bfa','#38bdf8','#34d399','#fb923c','#f472b6','#facc15'];
+
+function openViz() {
+  document.getElementById('vizOverlay').classList.add('open');
+  requestAnimationFrame(drawViz);
+}
+function closeViz() {
+  document.getElementById('vizOverlay').classList.remove('open');
+  document.getElementById('btnList').click();
+}
+
+function drawViz() {
+  const canvas = document.getElementById('vizCanvas');
+  const tooltip = document.getElementById('vizTooltip');
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const cx = W / 2, cy = H / 2;
+
+  // Group items by domain
+  const domainMap = {};
+  resultItems.forEach(item => {
+    (domainMap[item.domain] = domainMap[item.domain] || []).push(item);
+  });
+  const domains = Object.keys(domainMap);
+
+  // Pre-compute node positions
+  const nodes = [];
+  const R_min = 140, R_max = Math.min(W, H) * 0.42;
+  domains.forEach((domain, di) => {
+    const color = DOMAIN_COLORS[di % DOMAIN_COLORS.length];
+    const items = domainMap[domain];
+    const sectorAngle = (2 * Math.PI) / domains.length;
+    const baseAngle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+    items.forEach((item, ii) => {
+      const spread = (ii - (items.length - 1) / 2) * 0.35;
+      const angle = baseAngle + spread;
+      const r = R_min + (item.score / 10) * (R_max - R_min);
+      nodes.push({
+        item, color,
+        x: cx + Math.cos(angle) * r,
+        y: cy + Math.sin(angle) * r,
+        r: 5 + item.score * 1.4,
+      });
+    });
+  });
+
+  function render(hoveredNode) {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw connection lines
+    nodes.forEach(n => {
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(n.x, n.y);
+      ctx.strokeStyle = n.color + '18';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+
+    // Draw center bubble
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+    grad.addColorStop(0, '#7c5cfc33');
+    grad.addColorStop(1, '#7c5cfc00');
+    ctx.beginPath(); ctx.arc(cx, cy, 70, 0, Math.PI * 2);
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+    ctx.strokeStyle = '#7c5cfc55'; ctx.lineWidth = 1.5; ctx.stroke();
+
+    ctx.fillStyle = '#d4d4e4';
+    ctx.font = 'bold 13px -apple-system, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('我的茧房', cx, cy);
+
+    // Draw nodes
+    nodes.forEach(n => {
+      const isHov = n === hoveredNode;
+      ctx.beginPath(); ctx.arc(n.x, n.y, n.r + (isHov ? 3 : 0), 0, Math.PI * 2);
+      ctx.fillStyle = n.color + (isHov ? 'ee' : '88');
+      ctx.fill();
+      if (isHov) {
+        ctx.strokeStyle = n.color; ctx.lineWidth = 2; ctx.stroke();
+      }
+    });
+  }
+
+  render(null);
+
+  // Hover interaction
+  canvas.onmousemove = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let hovered = null;
+    for (const n of nodes) {
+      if (Math.hypot(mx - n.x, my - n.y) <= n.r + 4) { hovered = n; break; }
+    }
+    render(hovered);
+    if (hovered) {
+      document.getElementById('ttDomain').textContent = hovered.item.domain;
+      document.getElementById('ttTitle').textContent  = hovered.item.title;
+      document.getElementById('ttHook').textContent   = hovered.item.hook;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 12) + 'px';
+      tooltip.style.top  = (e.clientY - 30) + 'px';
+      canvas.style.cursor = 'pointer';
+    } else {
+      tooltip.style.display = 'none';
+      canvas.style.cursor = 'default';
+    }
+  };
+  canvas.onclick = e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    for (const n of nodes) {
+      if (Math.hypot(mx - n.x, my - n.y) <= n.r + 4) {
+        window.open(n.item.url, '_blank');
+        trackRead(n.item.url, n.item.domain);
+        break;
+      }
+    }
+  };
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; render(null); };
+}
+
+// ── URL param auto-fill (from Chrome extension) ──
+const urlBubble = new URLSearchParams(location.search).get('bubble');
+if (urlBubble) {
+  document.getElementById('bubbleInput').value = urlBubble;
+  history.replaceState({}, '', '/');
+}
+
+// ── aurora background ──
+function initParticles() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H, frame = 0;
+
+  const BLOBS = [
+    { x: 0.12, y: 0.15, c: '124,92,252' },
+    { x: 0.88, y: 0.22, c: '56,189,248'  },
+    { x: 0.48, y: 0.88, c: '52,211,153'  },
+    { x: 0.70, y: 0.50, c: '167,139,250' },
+  ];
+
+  function resize() {
+    W = canvas.width  = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    frame++;
+    const br = Math.min(W, H) * 0.65;
+    BLOBS.forEach((b, i) => {
+      const bx = (b.x + Math.sin(frame * 0.002 + i * 2.1) * 0.12) * W;
+      const by = (b.y + Math.cos(frame * 0.0015 + i * 1.7) * 0.10) * H;
+      const g  = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+      g.addColorStop(0,   `rgba(${b.c},0.12)`);
+      g.addColorStop(0.4, `rgba(${b.c},0.04)`);
+      g.addColorStop(1,   `rgba(${b.c},0)`);
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, 6.283);
+      ctx.fillStyle = g;
+      ctx.fill();
+    });
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ── noise / film grain overlay ──
+function initNoise() {
+  const overlay = document.getElementById('noiseOverlay');
+  if (!overlay) return;
+  const c = document.createElement('canvas');
+  c.width = c.height = 160;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(160, 160);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = (Math.random() * 255) | 0;
+    img.data[i] = img.data[i+1] = img.data[i+2] = v;
+    img.data[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  overlay.style.backgroundImage = `url(${c.toDataURL()})`;
+}
+
+// ── card holographic tilt ──
+function attachHoloEffect(card) {
+  const shine = card.querySelector('.card-shine');
+  if (!shine) return;
+  card.addEventListener('mousemove', e => {
+    const r  = card.getBoundingClientRect();
+    const nx = (e.clientX - r.left - r.width  / 2) / (r.width  / 2);
+    const ny = (e.clientY - r.top  - r.height / 2) / (r.height / 2);
+    card.style.transform = `perspective(700px) rotateY(${nx * 10}deg) rotateX(${-ny * 7}deg) translateZ(4px)`;
+    const sx = ((e.clientX - r.left) / r.width)  * 100;
+    const sy = ((e.clientY - r.top)  / r.height) * 100;
+    shine.style.opacity = '1';
+    shine.style.background = `radial-gradient(circle at ${sx}% ${sy}%, rgba(167,139,250,0.14) 0%, rgba(56,189,248,0.05) 50%, transparent 70%)`;
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = '';
+    shine.style.opacity  = '0';
+  });
+}
+
+// ── custom cursor ──
+function initCursor() {
+  const dot    = document.getElementById('cursorDot');
+  const trails = Array.from(document.querySelectorAll('.cursor-trail'));
+  const SIZES  = [7, 5.5, 4.5, 3.5, 2.5, 1.8];
+  trails.forEach((t, i) => { t.style.width = t.style.height = SIZES[i] + 'px'; });
+
+  const pts  = Array.from({ length: trails.length + 1 }, () => ({ x: -80, y: -80 }));
+  const LERP = 0.28;
+
+  window.addEventListener('mousemove', e => { pts[0].x = e.clientX; pts[0].y = e.clientY; });
+
+  function tick() {
+    dot.style.left = pts[0].x + 'px';
+    dot.style.top  = pts[0].y + 'px';
+    for (let i = 1; i < pts.length; i++) {
+      pts[i].x += (pts[i-1].x - pts[i].x) * LERP;
+      pts[i].y += (pts[i-1].y - pts[i].y) * LERP;
+      trails[i-1].style.left = pts[i].x + 'px';
+      trails[i-1].style.top  = pts[i].y + 'px';
+    }
+    requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+// ── progress beam ──
+function beamStart() {
+  const b = document.getElementById('progressBeam');
+  b.style.transition = 'none';
+  b.style.width = '0%';
+  b.style.opacity = '1';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    b.style.transition = 'width 0.55s cubic-bezier(0.4,0,0.2,1)';
+    b.style.width = '28%';
+    setTimeout(() => { b.style.transition = 'width 22s linear'; b.style.width = '82%'; }, 620);
+  }));
+}
+function beamDone() {
+  const b = document.getElementById('progressBeam');
+  b.style.transition = 'width 0.22s ease';
+  b.style.width = '100%';
+  setTimeout(() => {
+    b.style.transition = 'opacity 0.4s ease';
+    b.style.opacity = '0';
+    setTimeout(() => { b.style.width = '0%'; }, 450);
+  }, 250);
+}
+
 // init
 updateBookmarkUI();
+renderExploredBar();
+loadDaily();
+initParticles();
+initNoise();
+initCursor();
 </script>
 </body>
 </html>
