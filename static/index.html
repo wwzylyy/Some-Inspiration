@@ -1175,6 +1175,7 @@ async function startRecommend() {
 
   const sessionDomains = [];
   resultItems = [];  // reset buffer
+  vizData = null;
 
   function finalize() {
     btn.disabled = false;
@@ -1227,6 +1228,8 @@ async function startRecommend() {
           });
           const pill = document.getElementById('pill-' + cssId(d.domain));
           if (pill) pill.classList.add('searching');
+        } else if (evtName === 'viz_data') {
+          vizData = d;
         } else if (evtName === 'card') {
           header.classList.add('visible');
           resultItems.push(d);
@@ -1282,7 +1285,7 @@ function buildCard(item) {
             onclick="handleSave(this)"
           >${saved?'★ 已收藏':'☆ 收藏'}</button>
           <a class="read-link" href="${escHtml(item.url)}" target="_blank" rel="noopener"
-             onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}')">阅读 →</a>
+             onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}','${escHtml(item.title)}')">阅读 →</a>
         </div>
       </div>
       <div class="card-shine"></div>
@@ -1419,11 +1422,11 @@ function importXhs() {
 }
 
 // ── feedback tracking ──
-function trackRead(url, domain) {
+function trackRead(url, domain, title) {
   fetch('/feedback', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ url, domain, action: 'read' })
+    body: JSON.stringify({ url, domain, action: 'read', title: title || '' })
   }).catch(() => {});
 }
 function trackSkip(url, domain) {
@@ -1436,6 +1439,7 @@ function trackSkip(url, domain) {
 
 // ── result items buffer (for swipe + viz) ──
 let resultItems = [];
+let vizData = null;  // bubble PCA coords from server
 
 // ── view mode ──
 function setView(mode) {
@@ -1510,7 +1514,7 @@ function buildSwipeCardEl(item) {
       <span class="score-dots">${Array.from({length:10},(_,i)=>`<span class="dot${i<item.score?' active':''}"></span>`).join('')}</span>
       <a href="${escHtml(item.url)}" target="_blank" rel="noopener"
          style="color:#a78bfa;font-size:0.85rem;text-decoration:none"
-         onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}')">阅读 →</a>
+         onclick="trackRead('${escHtml(item.url)}','${escHtml(item.domain)}','${escHtml(item.title)}')">阅读 →</a>
     </div>`;
   div.dataset.item = JSON.stringify(item);
   return div;
@@ -1598,32 +1602,64 @@ function drawViz() {
 
   // Pre-compute node positions
   const nodes = [];
-  const R_min = 140, R_max = Math.min(W, H) * 0.42;
-  domains.forEach((domain, di) => {
-    const color = DOMAIN_COLORS[di % DOMAIN_COLORS.length];
-    const items = domainMap[domain];
-    const sectorAngle = (2 * Math.PI) / domains.length;
-    const baseAngle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
-    items.forEach((item, ii) => {
-      const spread = (ii - (items.length - 1) / 2) * 0.35;
-      const angle = baseAngle + spread;
-      const r = R_min + (item.score / 10) * (R_max - R_min);
-      nodes.push({
-        item, color,
-        x: cx + Math.cos(angle) * r,
-        y: cy + Math.sin(angle) * r,
-        r: 5 + item.score * 1.4,
+  const usePCA = vizData && resultItems.length > 0 && resultItems[0].pca_x !== undefined;
+
+  if (usePCA) {
+    // Real 2D layout from PCA semantic coordinates
+    const allX = resultItems.map(it => it.pca_x);
+    const allY = resultItems.map(it => it.pca_y);
+    const maxDim = Math.max(...allX.map(Math.abs), ...allY.map(Math.abs), 0.001);
+    const scale = Math.min(W, H) * 0.38 / maxDim;
+    domains.forEach((domain, di) => {
+      const color = DOMAIN_COLORS[di % DOMAIN_COLORS.length];
+      domainMap[domain].forEach(item => {
+        nodes.push({
+          item, color,
+          x: cx + item.pca_x * scale,
+          y: cy + item.pca_y * scale,
+          r: 5 + item.score * 1.4,
+        });
       });
     });
-  });
+  } else {
+    // Fallback radial layout
+    const R_min = 140, R_max = Math.min(W, H) * 0.42;
+    domains.forEach((domain, di) => {
+      const color = DOMAIN_COLORS[di % DOMAIN_COLORS.length];
+      const items = domainMap[domain];
+      const baseAngle = (di / domains.length) * 2 * Math.PI - Math.PI / 2;
+      items.forEach((item, ii) => {
+        const spread = (ii - (items.length - 1) / 2) * 0.35;
+        const angle = baseAngle + spread;
+        const r = R_min + (item.score / 10) * (R_max - R_min);
+        nodes.push({
+          item, color,
+          x: cx + Math.cos(angle) * r,
+          y: cy + Math.sin(angle) * r,
+          r: 5 + item.score * 1.4,
+        });
+      });
+    });
+  }
 
   function render(hoveredNode) {
     ctx.clearRect(0, 0, W, H);
 
+    // Bubble screen position (PCA-aware)
+    let bx = cx, by = cy;
+    if (usePCA && vizData) {
+      const allX = resultItems.map(it => it.pca_x);
+      const allY = resultItems.map(it => it.pca_y);
+      const maxDim = Math.max(...allX.map(Math.abs), ...allY.map(Math.abs), 0.001);
+      const scale = Math.min(W, H) * 0.38 / maxDim;
+      bx = cx + vizData.bubble_x * scale;
+      by = cy + vizData.bubble_y * scale;
+    }
+
     // Draw connection lines
     nodes.forEach(n => {
       ctx.beginPath();
-      ctx.moveTo(cx, cy);
+      ctx.moveTo(bx, by);
       ctx.lineTo(n.x, n.y);
       ctx.strokeStyle = n.color + '18';
       ctx.lineWidth = 1;
@@ -1631,18 +1667,18 @@ function drawViz() {
     });
 
     // Draw center bubble
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 70);
+    const grad = ctx.createRadialGradient(bx, by, 0, bx, by, 70);
     grad.addColorStop(0, '#7c5cfc33');
     grad.addColorStop(1, '#7c5cfc00');
-    ctx.beginPath(); ctx.arc(cx, cy, 70, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(bx, by, 70, 0, Math.PI * 2);
     ctx.fillStyle = grad; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, 52, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(bx, by, 52, 0, Math.PI * 2);
     ctx.strokeStyle = '#7c5cfc55'; ctx.lineWidth = 1.5; ctx.stroke();
 
     ctx.fillStyle = '#d4d4e4';
     ctx.font = 'bold 13px -apple-system, sans-serif';
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('我的茧房', cx, cy);
+    ctx.fillText('我的茧房', bx, by);
 
     // Draw nodes
     nodes.forEach(n => {
@@ -1686,7 +1722,7 @@ function drawViz() {
     for (const n of nodes) {
       if (Math.hypot(mx - n.x, my - n.y) <= n.r + 4) {
         window.open(n.item.url, '_blank');
-        trackRead(n.item.url, n.item.domain);
+        trackRead(n.item.url, n.item.domain, n.item.title);
         break;
       }
     }

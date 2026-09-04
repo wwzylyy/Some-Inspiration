@@ -16,14 +16,16 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bs4 import BeautifulSoup
 
 load_dotenv()
+import embedder
 
 app = FastAPI()
 client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "")
 
-BUBBLE_FILE   = Path("saved_bubble.json")
-DAILY_CACHE   = Path("daily_cache.json")
-FEEDBACK_FILE = Path("feedback.json")
+BUBBLE_FILE    = Path("saved_bubble.json")
+DAILY_CACHE    = Path("daily_cache.json")
+FEEDBACK_FILE  = Path("feedback.json")
+CENTROID_FILE  = Path("bubble_centroid.npy")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # ── bubble persistence ──
@@ -96,12 +98,11 @@ SCORE_AND_EXPLAIN_PROMPT = """用户的信息茧房是："{bubble}"
 正文节选：
 {content}
 
-请判断这篇文章是否适合作为"反推荐"，并生成解释。
+请为这篇文章生成反推荐说明（语言为中文）。
 
 返回JSON格式：
 {{
-  "score": 0-10（10=完美的反推荐），
-  "worth_showing": true/false,
+  "relevant": true/false（文章是否有实质内容，非广告/无意义/404页面）,
   "why_wont_find": "用户为什么不会主动发现这篇（1-2句）",
   "bridge": "这篇文章与用户关注领域之间隐藏的桥梁是什么（1-2句）",
   "hook": "一句吸引用户点击的推荐语"
@@ -141,7 +142,7 @@ async def search_content(query: str) -> list[dict]:
                 resp = await http.post(
                     "https://api.firecrawl.dev/v1/search",
                     headers={"Authorization": f"Bearer {FIRECRAWL_API_KEY}"},
-                    json={"query": query, "limit": 5}
+                    json={"query": query, "limit": 10}
                 )
                 if resp.status_code == 200:
                     return resp.json().get("data", [])
@@ -153,11 +154,11 @@ async def search_content(query: str) -> list[dict]:
         # Search Chinese content: zhihu, 36kr, jianshu, weixin articles
         cn_query = f"{query} site:zhihu.com OR site:36kr.com OR site:jianshu.com OR site:mp.weixin.qq.com"
         with DDGS() as ddgs:
-            results = list(ddgs.text(cn_query, max_results=6))
+            results = list(ddgs.text(cn_query, max_results=10))
         # fallback: plain query if no results
         if not results:
             with DDGS() as ddgs:
-                results = list(ddgs.text(query, max_results=5))
+                results = list(ddgs.text(query, max_results=8))
         return [{"title": r["title"], "url": r["href"], "description": r["body"]} for r in results]
     try:
         return await loop.run_in_executor(None, ddg_search)
@@ -200,46 +201,56 @@ async def fetch_article_content(url: str) -> str:
     return ""
 
 
-async def score_result(bubble: str, domain_name: str, result: dict) -> dict | None:
+async def score_result(bubble: str, domain_name: str, result: dict, bubble_emb=None) -> dict | None:
     title = result.get("title", "")
-    url = result.get("url", "")
+    url   = result.get("url", "")
     if not title or not url:
         return None
 
-    # Fetch full article content in parallel with nothing (just await it)
     article_text = await fetch_article_content(url)
-
-    # Fall back to description if scraping failed
     if not article_text:
         article_text = result.get("description", "") or result.get("markdown", "")
 
-    content_for_prompt = article_text[:2500] if article_text else f"(仅标题: {title})"
+    # ── Embedding-based surprise score ──
+    text_for_embed = f"{title}. {article_text[:600]}" if article_text else title
+    loop = asyncio.get_event_loop()
+    article_emb = await loop.run_in_executor(
+        None, lambda: embedder.embed([text_for_embed])[0]
+    )
+    score = embedder.surprise_score(bubble_emb, article_emb) if bubble_emb is not None else 5
 
+    # Filter only near-identical articles (cosine sim > 0.97 ≈ score 0)
+    if score < 1:
+        return None
+
+    # ── Claude generates qualitative explanations only (no scoring) ──
+    content_for_prompt = article_text[:2500] if article_text else f"(仅标题: {title})"
     prompt = SCORE_AND_EXPLAIN_PROMPT.format(
         bubble=bubble,
         domain=domain_name,
         title=title,
         content=content_for_prompt,
-        url=url,
         feedback_hint=feedback_hint_for_domain(domain_name),
     )
     try:
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=512,
+            max_tokens=400,
             messages=[{"role": "user", "content": prompt}]
         )
-        scored = parse_json_response(response.content[0].text)
-        if scored.get("worth_showing") and scored.get("score", 0) >= 6:
-            return {
-                "title": title,
-                "url": url,
-                "domain": domain_name,
-                "score": scored["score"],
-                "why_wont_find": scored["why_wont_find"],
-                "bridge": scored["bridge"],
-                "hook": scored["hook"],
-            }
+        explained = parse_json_response(response.content[0].text)
+        if not explained.get("relevant", True):
+            return None
+        return {
+            "title":         title,
+            "url":           url,
+            "domain":        domain_name,
+            "score":         score,
+            "why_wont_find": explained["why_wont_find"],
+            "bridge":        explained["bridge"],
+            "hook":          explained["hook"],
+            "_emb":          article_emb,   # internal — stripped before SSE emit
+        }
     except Exception:
         pass
     return None
@@ -250,7 +261,20 @@ def sse(event: str, data: dict) -> str:
 
 
 async def stream_recommend(bubble: str, explored: list[str] = []):
-    yield sse("status", {"msg": "正在分析茧房结构..."})
+    loop = asyncio.get_event_loop()
+
+    # Prefer stored centroid (history-derived) over fresh text embedding
+    stored = embedder.load_centroid(str(CENTROID_FILE))
+    if stored is not None:
+        bubble_emb = stored
+        yield sse("status", {"msg": "正在加载茧房向量画像..."})
+    else:
+        yield sse("status", {"msg": "正在计算茧房语义向量..."})
+        bubble_emb = await loop.run_in_executor(
+            None, lambda: embedder.embed([bubble])[0]
+        )
+
+    yield sse("status", {"msg": "正在生成反向领域..."})
     try:
         domains = await get_opposite_domains(bubble, explored)
     except Exception as e:
@@ -260,13 +284,11 @@ async def stream_recommend(bubble: str, explored: list[str] = []):
     yield sse("domains", {"domains": [d["name"] for d in domains]})
 
     seen_urls = set()
-    emitted = 0
 
     async def process_domain(domain: dict):
-        nonlocal emitted
         name = domain["name"]
         results = await search_content(domain["search_query"])
-        tasks = [score_result(bubble, name, r) for r in results[:3]]
+        tasks = [score_result(bubble, name, r, bubble_emb) for r in results[:8]]
         scored_list = await asyncio.gather(*tasks, return_exceptions=True)
         items = []
         for s in scored_list:
@@ -282,19 +304,38 @@ async def stream_recommend(bubble: str, explored: list[str] = []):
         result = await process_domain(domain)
         await queue.put(result)
 
-    tasks = [asyncio.create_task(worker(d)) for d in domains]
+    worker_tasks = [asyncio.create_task(worker(d)) for d in domains]
 
+    # Collect all results (stream "searching" events as each domain finishes)
+    all_items = []
     for _ in range(len(domains)):
         name, items = await queue.get()
         yield sse("searching", {"domain": name})
-        for item in items:
-            if emitted >= 8:
-                break
-            emitted += 1
-            yield sse("card", item)
+        all_items.extend(items)
 
-    await asyncio.gather(*tasks, return_exceptions=True)
-    yield sse("done", {"total": emitted})
+    await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+    # MMR diversity selection — pick 8 articles spread across semantic space
+    final_items = embedder.mmr_select(bubble_emb, all_items, k=8)
+
+    # Hard minimum: if MMR returns fewer than 3, pad with highest-scored items
+    if len(final_items) < 3 and len(all_items) >= 3:
+        seen = {id(x) for x in final_items}
+        extras = [x for x in sorted(all_items, key=lambda x: x['score'], reverse=True)
+                  if id(x) not in seen]
+        final_items.extend(extras[:3 - len(final_items)])
+
+    # PCA 2D coords — attach pca_x/pca_y to each item, get bubble coords
+    viz_coords = embedder.prepare_viz_data(bubble_emb, final_items)
+    if viz_coords:
+        yield sse("viz_data", viz_coords)
+
+    # Emit cards (strip internal _emb field before sending)
+    for item in final_items:
+        item.pop("_emb", None)
+        yield sse("card", item)
+
+    yield sse("done", {"total": len(final_items)})
 
 
 # ── daily cache job ──
@@ -330,6 +371,9 @@ scheduler.add_job(daily_digest_job, "cron", hour=8, minute=0)
 @app.on_event("startup")
 async def startup():
     scheduler.start()
+    # Preload embedding model in background thread (downloads ~400MB on first run)
+    import threading
+    threading.Thread(target=embedder.get_model, daemon=True).start()
 
 @app.on_event("shutdown")
 async def shutdown():
@@ -364,6 +408,12 @@ async def douyin_stream():
                 None, analyze_bubble, titles, client
             )
             yield sse("bubble", {"bubble": bubble, "count": len(titles)})
+            # Build centroid from scraped titles in background
+            def _build():
+                c = embedder.compute_centroid(titles[:200])
+                embedder.save_centroid(c, str(CENTROID_FILE))
+                print(f"[centroid] built from {len(titles)} douyin titles")
+            asyncio.get_event_loop().run_in_executor(None, _build)
         else:
             yield sse("error", {"msg": "未获取到数据，请重试"})
         yield sse("done", {})
@@ -402,6 +452,12 @@ async def xhs_stream():
                 None, analyze_bubble, notes, client
             )
             yield sse("bubble", {"bubble": bubble, "count": len(notes)})
+            # Build centroid from scraped notes in background
+            def _build():
+                c = embedder.compute_centroid(notes[:200])
+                embedder.save_centroid(c, str(CENTROID_FILE))
+                print(f"[centroid] built from {len(notes)} xhs notes")
+            asyncio.get_event_loop().run_in_executor(None, _build)
         else:
             yield sse("error", {"msg": "未获取到笔记，请重试"})
         yield sse("done", {})
@@ -457,7 +513,8 @@ async def refresh_daily():
 class FeedbackRequest(BaseModel):
     url: str
     domain: str
-    action: str  # "read" | "skip"
+    action: str       # "read" | "skip"
+    title: str = ""   # article title — used to drift centroid on "read"
 
 @app.post("/feedback")
 async def post_feedback(req: FeedbackRequest):
@@ -468,6 +525,20 @@ async def post_feedback(req: FeedbackRequest):
     else:
         d["skips"] += 1
     save_feedback(data)
+
+    # Drift centroid toward the article the user just read
+    if req.action == "read" and req.title and CENTROID_FILE.exists():
+        loop = asyncio.get_event_loop()
+        title = req.title
+        def _drift():
+            current = embedder.load_centroid(str(CENTROID_FILE))
+            if current is None:
+                return
+            new_emb = embedder.embed([title])[0]
+            updated = embedder.update_centroid(current, new_emb, decay=0.92)
+            embedder.save_centroid(updated, str(CENTROID_FILE))
+        loop.run_in_executor(None, _drift)
+
     return {"status": "ok"}
 
 @app.get("/feedback")
@@ -503,6 +574,16 @@ async def import_history(req: HistoryRequest):
         messages=[{"role": "user", "content": prompt}]
     )
     bubble = response.content[0].text.strip().strip('"').strip("'")
+
+    # Build centroid from all history titles (background, non-blocking)
+    loop = asyncio.get_event_loop()
+    titles_for_centroid = entries[:200]
+    def _build_centroid():
+        centroid = embedder.compute_centroid(titles_for_centroid)
+        embedder.save_centroid(centroid, str(CENTROID_FILE))
+        print(f"[centroid] built from {len(titles_for_centroid)} history titles")
+    loop.run_in_executor(None, _build_centroid)
+
     return {"bubble": bubble, "count": len(entries)}
 
 
